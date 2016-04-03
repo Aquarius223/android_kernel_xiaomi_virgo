@@ -3089,6 +3089,14 @@ config FORCE_FAST_CHARGE
 		A simple sysfs interface to force adapters that
 		are detected as USB to charge as AC.
 
+config BRICKED_HOTPLUG
+	bool "Enable kernel based mpdecision"
+	depends on MSM_RUN_QUEUE_STATS
+	default y
+	help
+		This enables kernel based multi core control.
+		(up/down hotplug based on load)
+
 endif
 
 config KERNEL_TEXT_MPU_PROT
