@@ -72,6 +72,8 @@ CONFIG_HAVE_GENERIC_HARDIRQS=y
 =======
 # SticKernel Modules
 #
+CONFIG_BOEFFLA_WL_BLOCKER=y
+CONFIG_KSM=y
 CONFIG_KLAPSE=y
 CONFIG_FRANDOM=y
 # CONFIG_WIREGUARD is not set
@@ -696,7 +698,10 @@ CONFIG_MIGRATION=y
 CONFIG_ZONE_DMA_FLAG=0
 CONFIG_BOUNCE=y
 CONFIG_VIRT_TO_BUS=y
+<<<<<<< HEAD:arch/arm/configs/cancro_user_defconfig
 # CONFIG_KSM is not set
+=======
+>>>>>>> 05eba97b403... boeffla_wl_blocker: add generic wakelock blocker driver v1.0.0:arch/arm/configs/stic-cancro_defconfig
 CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
 # CONFIG_CLEANCACHE is not set
 CONFIG_MEMORY_HOLE_CARVEOUT=y
