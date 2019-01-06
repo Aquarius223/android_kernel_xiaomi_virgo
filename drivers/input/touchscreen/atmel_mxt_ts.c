@@ -609,11 +609,12 @@ struct mxt_data {
 	bool use_last_golden;
 	struct mutex golden_mutex;
 	bool is_wakeable;
-    	bool is_suspended;
-    	bool is_resumed;
-    	bool irq_enabled;
+    bool is_suspended;
+    bool is_resumed;
+    bool irq_enabled;
 	bool screen_off;
 	bool in_deepsleep;
+	bool button_0d_enabled;
 
 	/* Slowscan parameters	*/
 	int slowscan_enabled;
@@ -1757,7 +1758,7 @@ static void mxt_proc_t15_messages(struct mxt_data *data, u8 *msg)
 	unsigned long keystates = le32_to_cpu(msg[2]);
 	int index = data->current_index;
 
-	if(data->screen_off)
+	if(!data->button_0d_enabled || data->screen_off)
 		return;
 
 	for (key = 0; key < pdata->config_array[index].key_num; key++) {
@@ -3132,6 +3133,7 @@ static int mxt_initialize(struct mxt_data *data)
 	int error;
 	u8 retry_count = 0;
 
+	data->button_0d_enabled = true;
 
 retry_probe:
 	/* Read info block */
@@ -4785,6 +4787,33 @@ static ssize_t mxt_mem_access_write(struct file *filp, struct kobject *kobj,
 	return ret == 0 ? count : 0;
 }
 
+static ssize_t mxt_0dbutton_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct mxt_data *data = dev_get_drvdata(dev);
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+			data->button_0d_enabled);
+}
+
+static ssize_t mxt_0dbutton_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+
+	unsigned int input;
+	struct mxt_data *data = dev_get_drvdata(dev);
+
+	if (sscanf(buf, "%u", &input) != 1)
+		return -EINVAL;
+
+	input = input > 0 ? 1 : 0;
+
+	dev_info(dev, "%s: input %d\n", __func__, input);
+
+	data->button_0d_enabled = input;
+
+	return count;
+}
+
 static DEVICE_ATTR(update_fw, S_IWUSR | S_IRUSR, mxt_update_fw_show, mxt_update_fw_store);
 static DEVICE_ATTR(debug_enable, S_IWUSR | S_IRUSR, mxt_debug_enable_show,
 			mxt_debug_enable_store);
@@ -4804,6 +4833,7 @@ static DEVICE_ATTR(diagnostic, S_IWUSR | S_IRUSR, mxt_diagnostic_show, mxt_diagn
 static DEVICE_ATTR(sensitive_mode, S_IWUSR | S_IRUSR, mxt_sensitive_mode_show, mxt_sensitive_mode_store);
 static DEVICE_ATTR(chip_reset, S_IWUSR, NULL, mxt_chip_reset_store);
 static DEVICE_ATTR(chg_state, S_IRUGO, mxt_chg_state_show, NULL);
+static DEVICE_ATTR(nav_button_enable, S_IRUGO | S_IWUGO, mxt_0dbutton_show, mxt_0dbutton_store);
 
 static struct attribute *mxt_attrs[] = {
 	&dev_attr_update_fw.attr,
@@ -4822,6 +4852,7 @@ static struct attribute *mxt_attrs[] = {
 	&dev_attr_sensitive_mode.attr,
 	&dev_attr_chip_reset.attr,
 	&dev_attr_chg_state.attr,
+	&dev_attr_nav_button_enable.attr,
 	NULL
 };
 
