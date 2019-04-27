@@ -1618,7 +1618,7 @@
 	qcom,chipid = <0x03030002>;
 	qcom,msm-bus,num-cases = <15>;
 	qcom,bus-control;
-	qcom,initial-pwrlevel = <5>;
+	qcom,initial-pwrlevel = <6>;
 
 	/* Updated bus bandwidth requirements */
 	qcom,msm-bus,vectors-KBps =
@@ -1696,15 +1696,21 @@
 
                qcom,gpu-pwrlevel@5 {
                        reg = <5>;
+                       qcom,gpu-freq = <100000000>;
+                       qcom,bus-freq = <1>;
+                       qcom,io-fraction = <101>;
+               };
+               qcom,gpu-pwrlevel@6 {
+                       reg = <6>;
                        qcom,gpu-freq = <27000000>;
                        qcom,bus-freq = <0>;
                        qcom,io-fraction = <101>;
                };
                
-			   /* this dummy power level 6 is implemented to make
-				  the system use power level 5; it is never actively used */
-               qcom,gpu-pwrlevel@6 {
-                       reg = <6>;
+			   /* this dummy power level 7 is implemented to make
+				  the system use power level 6; it is never actively used */
+               qcom,gpu-pwrlevel@7 {
+                       reg = <7>;
                        qcom,gpu-freq = <27000000>;
                        qcom,bus-freq = <0>;
                        qcom,io-fraction = <101>;
