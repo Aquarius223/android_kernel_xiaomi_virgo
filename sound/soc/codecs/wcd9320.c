@@ -44,6 +44,10 @@
 #include "wcd9xxx-common.h"
 #include "wcdcal-hwdep.h"
 
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+#include <linux/input/wake_helpers.h>
+int var_is_headset_in_use = 0;
+#endif
 
 #ifdef CONFIG_SND_SOC_TPA6130A2
 #include "tpa6130a2.h"
@@ -3347,6 +3351,9 @@ static int taiko_hphl_dac_event(struct snd_soc_dapm_widget *w,
 						 WCD9XXX_CLSH_STATE_HPHL,
 						 WCD9XXX_CLSH_REQ_ENABLE,
 						 WCD9XXX_CLSH_EVENT_PRE_DAC);
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+		var_is_headset_in_use = 1;
+#endif
 		ret = wcd9xxx_mbhc_get_impedance(&taiko_p->mbhc,
 					&impedl, &impedr);
 		if (!ret)
@@ -3358,6 +3365,9 @@ static int taiko_hphl_dac_event(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_POST_PMD:
 		snd_soc_update_bits(codec, TAIKO_A_CDC_CLK_RDAC_CLK_EN_CTL,
 							0x02, 0x00);
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+		var_is_headset_in_use = 0;
+#endif
 		break;
 	}
 	return 0;

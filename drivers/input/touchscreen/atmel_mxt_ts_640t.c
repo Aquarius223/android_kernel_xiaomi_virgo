@@ -34,6 +34,9 @@
 #include <linux/notifier.h>
 #include <linux/fb.h>
 #endif
+#include <linux/input/doubletap2wake.h>
+#include <linux/input/sweep2wake.h>
+#include <linux/input/wake_helpers.h>
 
 
 /* Version */
@@ -624,7 +627,6 @@ struct mxt_data {
 	u8 lockdown_info[MXT_LOCKDOWN_SIZE];
 	u8 userdata_info[MXT_USERDATA_SIZE];
 	bool firmware_updated;
-	bool button_0d_enabled;
 
 	/* Slowscan parameters	*/
 	int slowscan_enabled;
@@ -639,6 +641,7 @@ struct mxt_data {
 	struct work_struct self_tuning_work;
 	struct work_struct hover_loading_work;
 	bool finger_down[MXT_MAX_FINGER_NUM];
+	bool screen_off;
 
 	/* Cached parameters from object table */
 	u16 T5_address;
@@ -668,6 +671,7 @@ struct mxt_data {
 	u8 T100_reportid_min;
 	u8 T100_reportid_max;
 	u8 T109_reportid;
+	bool is_suspended;
 
 #ifdef CONFIG_FB
 	struct notifier_block fb_notif;
@@ -702,6 +706,8 @@ static const struct mxt_i2c_address_pair mxt_i2c_addresses[] = {
 	{ 0x35, 0x5b },
 #endif
 };
+
+struct mxt_data *mxt_shared_data = NULL;
 
 static struct gpiomux_setting mxt_rst_cutoff_pwr_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -746,6 +752,15 @@ static int mxt_bootloader_read(struct mxt_data *data, u8 *val, unsigned int coun
 	ret = i2c_transfer(data->client->adapter, &msg, 1);
 
 	return (ret == 1) ? 0 : ret;
+}
+
+static int mxt_prevent_sleep (void) {
+	if (dt2w_switch == 1 || s2w_switch > 0) {
+		return 1;
+	} else {
+		return 0;
+	}
+
 }
 
 static int mxt_bootloader_write(struct mxt_data *data, const u8 * const val,
@@ -1381,7 +1396,7 @@ static void mxt_proc_t15_messages(struct mxt_data *data, u8 *msg)
 	unsigned long keystates = le32_to_cpu(msg[2]);
 	int index = data->current_index;
 
-	if(!data->button_0d_enabled)
+	if(data->screen_off)
 		return;
 
 	for (key = 0; key < pdata->config_array[index].key_num; key++) {
@@ -2993,7 +3008,6 @@ static int mxt_initialize(struct mxt_data *data)
 	int error;
 	u8 retry_count = 0;
 
-	data->button_0d_enabled = true;
 
 retry_probe:
 	/* Read info block */
@@ -4107,11 +4121,11 @@ static void mxt_enable_gesture_mode(struct mxt_data *data)
 	u8 t81_val;
 	int error;
 
-	if (data->wakeup_gesture_mode)
+	if (data->wakeup_gesture_mode) {
 		t81_val = 7;
-	else
+	} else {
 		t81_val = 0;
-
+	}
 	error = mxt_write_object(data, MXT_TOUCH_MORE_GESTURE_T81,
 				MXT_GESTURE_CTRL, t81_val);
 	if (error)
@@ -4127,9 +4141,6 @@ static ssize_t  mxt_wakeup_mode_store(struct device *dev,
 	int index = data->current_index;
 	unsigned long val;
 	int error;
-
-	if (pdata->config_array[index].wake_up_self_adcx == 0)
-		return count;
 
 	error = strict_strtoul(buf, 0, &val);
 
@@ -4350,13 +4361,6 @@ static void mxt_switch_mode_work(struct work_struct *work)
 	else if (value == MXT_INPUT_EVENT_STYLUS_MODE_ON ||
 				value == MXT_INPUT_EVENT_STYLUS_MODE_OFF)
 		mxt_stylus_mode_switch(data, (bool)(value - MXT_INPUT_EVENT_STYLUS_MODE_OFF));
-	else if (value == MXT_INPUT_EVENT_WAKUP_MODE_ON ||
-				value == MXT_INPUT_EVENT_WAKUP_MODE_OFF) {
-		if (pdata->config_array[index].wake_up_self_adcx != 0) {
-			data->wakeup_gesture_mode = value - MXT_INPUT_EVENT_WAKUP_MODE_OFF;
-			mxt_enable_gesture_mode(data);
-		}
-	}
 
 	if (ms != NULL) {
 		kfree(ms);
@@ -4431,33 +4435,6 @@ static ssize_t mxt_mem_access_write(struct file *filp, struct kobject *kobj,
 	return ret == 0 ? count : 0;
 }
 
-static ssize_t mxt_0dbutton_show(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct mxt_data *data = dev_get_drvdata(dev);
-	return snprintf(buf, PAGE_SIZE, "%u\n",
-			data->button_0d_enabled);
-}
-
-static ssize_t mxt_0dbutton_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-
-	unsigned int input;
-	struct mxt_data *data = dev_get_drvdata(dev);
-
-	if (sscanf(buf, "%u", &input) != 1)
-		return -EINVAL;
-
-	input = input > 0 ? 1 : 0;
-
-	dev_info(dev, "%s: input %d\n", __func__, input);
-
-	data->button_0d_enabled = input;
-
-	return count;
-}
-
 static DEVICE_ATTR(update_fw, S_IWUSR | S_IRUSR, mxt_update_fw_show, mxt_update_fw_store);
 static DEVICE_ATTR(debug_enable, S_IWUSR | S_IRUSR, mxt_debug_enable_show,
 		mxt_debug_enable_store);
@@ -4475,7 +4452,6 @@ static DEVICE_ATTR(diagnostic, S_IWUSR | S_IRUSR, mxt_diagnostic_show, mxt_diagn
 static DEVICE_ATTR(sensitive_mode, S_IWUSR | S_IRUSR, mxt_sensitive_mode_show, mxt_sensitive_mode_store);
 static DEVICE_ATTR(chip_reset, S_IWUSR, NULL, mxt_chip_reset_store);
 static DEVICE_ATTR(chg_state, S_IRUGO, mxt_chg_state_show, NULL);
-static DEVICE_ATTR(nav_button_enable, S_IRUGO | S_IWUGO, mxt_0dbutton_show, mxt_0dbutton_store);
 static DEVICE_ATTR(wakeup_mode, S_IWUSR | S_IRUSR, mxt_wakeup_mode_show, mxt_wakeup_mode_store);
 static DEVICE_ATTR(hover_tune, S_IWUSR | S_IRUSR, mxt_hover_tune_show, mxt_hover_tune_store);
 static DEVICE_ATTR(hover_from_flash, S_IWUSR, NULL, mxt_hover_from_flash_store);
@@ -4496,7 +4472,6 @@ static struct attribute *mxt_attrs[] = {
 	&dev_attr_sensitive_mode.attr,
 	&dev_attr_chip_reset.attr,
 	&dev_attr_chg_state.attr,
-	&dev_attr_nav_button_enable.attr,
 	&dev_attr_wakeup_mode.attr,
 	&dev_attr_hover_tune.attr,
 	&dev_attr_hover_from_flash.attr,
@@ -4633,6 +4608,7 @@ static void mxt_start(struct mxt_data *data)
 
 	if (data->wakeup_gesture_mode) {
 		mxt_set_gesture_wake_up(data, false);
+		mxt_enable_gesture_mode(data);
 		if (!data->is_wakeup_by_gesture)
 			mxt_set_t7_for_gesture(data, false);
 		data->is_stopped = 0;
@@ -4640,10 +4616,11 @@ static void mxt_start(struct mxt_data *data)
 	} else {
 		if (data->is_stopped == 0)
 			return;
-
+	if (!mxt_prevent_sleep()) {  
 		error = mxt_set_power_cfg(data, MXT_POWER_CFG_RUN);
 		if (error)
 			return;
+	}
 		/* At this point, it may be necessary to clear state
 		 * by disabling/re-enabling the noise suppression object */
 
@@ -4663,16 +4640,18 @@ static void mxt_stop(struct mxt_data *data)
 		data->is_wakeup_by_gesture = false;
 		mxt_set_t7_for_gesture(data, true);
 		mxt_set_gesture_wake_up(data, true);
+		mxt_enable_gesture_mode(data);
 		data->is_stopped = 1;
 	} else {
 		if (data->is_stopped)
 			return;
 
 		cancel_delayed_work_sync(&data->calibration_delayed_work);
-		error = mxt_set_power_cfg(data, MXT_POWER_CFG_DEEPSLEEP);
-
-		if (!error)
+		if (!mxt_prevent_sleep()) {
+		     error = mxt_set_power_cfg(data, MXT_POWER_CFG_DEEPSLEEP);
+		  if (!error)
 			dev_dbg(dev, "MXT suspended\n");
+		}
 	}
 }
 
@@ -4715,6 +4694,9 @@ static int mxt_suspend(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mxt_data *data = i2c_get_clientdata(client);
 	struct input_dev *input_dev = data->input_dev;
+	if (data->is_suspended) {
+		return 0;
+	}
 
 	if (data->pdata->cut_off_power) {
 		/* In the power is cut off with LCD off, wake up gesture can not be used */
@@ -4753,7 +4735,7 @@ static int mxt_suspend(struct device *dev)
 
 		mutex_unlock(&input_dev->mutex);
 	} else {
-		if (!data->wakeup_gesture_mode)
+		if (!mxt_prevent_sleep() || in_phone_call())
 			mxt_disable_irq(data);
 
 		mutex_lock(&input_dev->mutex);
@@ -4784,7 +4766,7 @@ static int mxt_suspend(struct device *dev)
 		}
 	}
 
-
+	data->is_suspended=true;
 	return 0;
 }
 
@@ -4794,6 +4776,10 @@ static int mxt_resume(struct device *dev)
 	struct i2c_client *client = to_i2c_client(dev);
 	struct mxt_data *data = i2c_get_clientdata(client);
 	struct input_dev *input_dev = data->input_dev;
+
+	if(!data->is_suspended) {
+		return 0;
+	}
 
 	if (data->pdata->cut_off_power) {
 		mutex_lock(&input_dev->mutex);
@@ -4828,9 +4814,7 @@ static int mxt_resume(struct device *dev)
 
 		mutex_unlock(&input_dev->mutex);
 	} else {
-		if (!data->wakeup_gesture_mode)
-			mxt_enable_irq(data);
-
+		
 		if (data->regulator_vdd && data->regulator_avdd && data->regulator_vddio) {
 			ret = regulator_enable(data->regulator_vdd);
 			if (ret < 0) {
@@ -4855,7 +4839,9 @@ static int mxt_resume(struct device *dev)
 			mxt_start(data);
 
 		mutex_unlock(&input_dev->mutex);
-	}
+		mxt_enable_irq(data);	
+ 	}
+	data->is_suspended=false;
 	return 0;
 }
 
@@ -4896,9 +4882,11 @@ static int fb_notifier_cb(struct notifier_block *self,
 		blank = evdata->data;
 		if (*blank == FB_BLANK_UNBLANK) {
 			dev_info(&mxt_data->client->dev, "##### UNBLANK SCREEN #####\n");
+			mxt_data->screen_off=false;
 			mxt_input_enable(mxt_data->input_dev);
 		} else if (*blank == FB_BLANK_POWERDOWN) {
 			dev_info(&mxt_data->client->dev, "##### BLANK SCREEN #####\n");
+			mxt_data->screen_off=true;
 			mxt_input_disable(mxt_data->input_dev);
 		}
 	}
@@ -5525,7 +5513,7 @@ retry:
 		goto err_restore_int_gpio_setting;
 
 	error = request_threaded_irq(client->irq, NULL, mxt_interrupt,
-			pdata->irqflags, client->dev.driver->name, data);
+			pdata->irqflags | IRQF_NO_SUSPEND, client->dev.driver->name, data);
 	if (error) {
 		dev_err(&client->dev, "Error %d registering irq\n", error);
 		goto err_free_input_device;
@@ -5559,6 +5547,9 @@ retry:
 
 	mxt_debugfs_init(data);
 	schedule_work(&data->hover_loading_work);
+	mxt_shared_data = data;
+    	data->is_suspended = false;
+	data->screen_off = false;
 
 	return 0;
 
@@ -5645,13 +5636,11 @@ static void mxt_shutdown(struct i2c_client *client)
 	data->state = SHUTDOWN;
 }
 
-#ifdef CONFIG_PM
 static int mxt_ts_suspend(struct device *dev)
 {
 	struct mxt_data *data =  dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev) &&
-			data->wakeup_gesture_mode) {
+	if (mxt_prevent_sleep()) {
 		dev_info(dev, "touch enable irq wake\n");
 		mxt_disable_irq(data);
 		enable_irq_wake(data->client->irq);
@@ -5664,8 +5653,7 @@ static int mxt_ts_resume(struct device *dev)
 {
 	struct mxt_data *data =  dev_get_drvdata(dev);
 
-	if (device_may_wakeup(dev) &&
-			data->wakeup_gesture_mode) {
+	if (mxt_prevent_sleep()) {
 		dev_info(dev, "touch disable irq wake\n");
 		disable_irq_wake(data->client->irq);
 		mxt_enable_irq(data);
@@ -5674,13 +5662,7 @@ static int mxt_ts_resume(struct device *dev)
 	return 0;
 }
 
-static const struct dev_pm_ops mxt_touchscreen_pm_ops = {
-#ifndef CONFIG_HAS_EARLYSUSPEND
-	.suspend        = mxt_ts_suspend,
-	.resume         = mxt_ts_resume,
-#endif
-};
-#endif
+static SIMPLE_DEV_PM_OPS(mxt_touchscreen_pm_ops, mxt_ts_suspend, mxt_ts_resume);
 
 static const struct i2c_device_id mxt_id[] = {
 	{ "qt602240_ts", 0 },
@@ -5704,9 +5686,7 @@ static struct i2c_driver mxt_driver = {
 		.name	= "atmel_mxt_ts_640t",
 		.owner	= THIS_MODULE,
 		.of_match_table = mxt_match_table,
-#ifdef CONFIG_PM
 		.pm = &mxt_touchscreen_pm_ops,
-#endif
 	},
 	.probe		= mxt_probe,
 	.remove		= __devexit_p(mxt_remove),
