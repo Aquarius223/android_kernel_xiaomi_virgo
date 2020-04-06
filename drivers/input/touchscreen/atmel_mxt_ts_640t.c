@@ -4780,8 +4780,6 @@ static int mxt_suspend(struct device *dev)
 		if (input_dev->users)
 			mxt_stop(data);
 
-		mutex_unlock(&input_dev->mutex);
-
 		mxt_clear_touch_event(data);
 
 		if (data->regulator_vdd && data->regulator_avdd && data->regulator_vddio) {
@@ -4801,9 +4799,9 @@ static int mxt_suspend(struct device *dev)
 				"Atmel regulator disable for vddio failed: %d\n", ret);
 			}
 		}
-	}
-
 	data->is_suspended=true;
+	mutex_unlock(&input_dev->mutex);
+	}
 	return 0;
 }
 
