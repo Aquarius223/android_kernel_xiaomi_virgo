@@ -84,5 +84,8 @@ GTAGS
 *~
 \#*#
 
+# out-kernel
+out
+
 # Generated source files
 smd_rpc_sym.c
