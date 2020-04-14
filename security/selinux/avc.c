@@ -740,6 +740,10 @@ static noinline int slow_avc_audit(u32 ssid, u32 tsid, u16 tclass,
 	struct common_audit_data stack_data;
 	struct selinux_audit_data sad = {0,};
 	struct selinux_late_audit_data slad;
+	
+/* off selinux log */
+	if (denied && !result)
+		return 0;
 
 	if (!a) {
 		a = &stack_data;
