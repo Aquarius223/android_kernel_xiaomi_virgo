@@ -310,6 +310,16 @@ config NOMMU_INITIAL_TRIM_EXCESS
 	  of 1 says that all excess pages should be trimmed.
 
 	  See Documentation/nommu-mmap.txt for more information.
+	  
+config VM_MAX_READAHEAD
+	int "Default max vm readahead size"
+	default "128"
+	range 16 4096
+	
+config VM_MIN_READAHEAD
+	int "Default min vm readahead size"
+	default "16"
+	range 16 4096
 
 config TRANSPARENT_HUGEPAGE
 	bool "Transparent Hugepage Support"
