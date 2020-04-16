@@ -3,6 +3,7 @@
  *
  * Copyright (C) 2010 Google, Inc.
  * Copyright (C) 2017 XiaoMi, Inc.
+ * Copyright (C) 2020 Amktiao.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -36,6 +37,20 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/cpufreq_interactive.h>
 
+/* interactive */
+#define DEFAULT_GO_HISPEED_LOAD 95
+#define DEFAULT_TARGET_LOAD 90
+#define DEFAULT_TIMER_SLACK (4 * DEFAULT_TIMER_RATE)
+#define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
+#define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
+
+/* stic old bak */
+	int prev_load;
+	bool limits_changed;
+	unsigned int nr_timer_resched;
+	u64 last_evaluated_jiffy;
+	spinlock_t target_freq_lock;
+
 #define MIN(x, y) x <= y ? x : y
 extern int thermal_max_freq;
 extern int sys_max_freq;
@@ -45,7 +60,7 @@ static int active_count;
 struct cpufreq_interactive_cpuinfo {
 	struct timer_list cpu_timer;
 	struct timer_list cpu_slack_timer;
-	spinlock_t load_lock; /* protects the next 4 fields */
+	spinlock_t load_lock;
 	u64 time_in_idle;
 	u64 time_in_idle_timestamp;
 	u64 cputime_speedadj;
@@ -53,35 +68,28 @@ struct cpufreq_interactive_cpuinfo {
 	u64 last_evaluated_jiffy;
 	struct cpufreq_policy *policy;
 	struct cpufreq_frequency_table *freq_table;
-	spinlock_t target_freq_lock; /*protects target freq */
+	spinlock_t target_freq_lock;
 	unsigned int target_freq;
 	unsigned int floor_freq;
 	unsigned int max_freq;
 	u64 floor_validate_time;
-	u64 hispeed_validate_time; /* cluster hispeed_validate_time */
-	u64 local_hvtime; /* per-cpu hispeed_validate_time */
+	u64 hispeed_validate_time;
+	u64 local_hvtime;
 	u64 max_freq_idle_start_time;
 	struct rw_semaphore enable_sem;
 	int governor_enabled;
+	bool stic_boosted;
 };
 
 static DEFINE_PER_CPU(struct cpufreq_interactive_cpuinfo, cpuinfo);
 
-/* realtime thread handles frequency scaling */
 static struct task_struct *speedchange_task;
 static cpumask_t speedchange_cpumask;
 static spinlock_t speedchange_cpumask_lock;
 static struct mutex gov_lock;
 
-/* Hi speed to bump to from lo speed when load burst (default max) */
 static unsigned int hispeed_freq;
-
-/* Go to hi speed when CPU load at or above this value. */
-#define DEFAULT_GO_HISPEED_LOAD 99
 static unsigned long go_hispeed_load = DEFAULT_GO_HISPEED_LOAD;
-
-/* Target load.  Lower values result in higher CPU speeds. */
-#define DEFAULT_TARGET_LOAD 90
 static unsigned int default_target_loads[] = {DEFAULT_TARGET_LOAD};
 static spinlock_t target_loads_lock;
 static unsigned int *target_loads = default_target_loads;
@@ -90,13 +98,11 @@ static int ntarget_loads = ARRAY_SIZE(default_target_loads);
 /*
  * The minimum amount of time to spend at a frequency before we can ramp down.
  */
-#define DEFAULT_MIN_SAMPLE_TIME (80 * USEC_PER_MSEC)
 static unsigned long min_sample_time = DEFAULT_MIN_SAMPLE_TIME;
 
 /*
  * The sample rate of the timer used to increase frequency
  */
-#define DEFAULT_TIMER_RATE (20 * USEC_PER_MSEC)
 static unsigned long timer_rate = DEFAULT_TIMER_RATE;
 
 /*
@@ -125,7 +131,6 @@ static bool boosted;
  * Max additional time to wait in idle, beyond timer_rate, at speeds above
  * minimum before wakeup to reduce speed, or -1 if unnecessary.
  */
-#define DEFAULT_TIMER_SLACK (4 * DEFAULT_TIMER_RATE)
 static int timer_slack_val = DEFAULT_TIMER_SLACK;
 
 /*
@@ -268,11 +273,6 @@ static unsigned int choose_freq(
 		prevfreq = freq;
 		tl = freq_to_targetload(freq);
 
-		/*
-		 * Find the lowest frequency where the computed load is less
-		 * than or equal to the target load.
-		 */
-
 		if (cpufreq_frequency_table_target(
 			    pcpu->policy, pcpu->freq_table, loadadjfreq / tl,
 			    CPUFREQ_RELATION_L, &index))
@@ -280,14 +280,9 @@ static unsigned int choose_freq(
 		freq = pcpu->freq_table[index].frequency;
 
 		if (freq > prevfreq) {
-			/* The previous frequency is too low. */
 			freqmin = prevfreq;
 
 			if (freq >= freqmax) {
-				/*
-				 * Find the highest frequency that is less
-				 * than freqmax.
-				 */
 				if (cpufreq_frequency_table_target(
 					    pcpu->policy, pcpu->freq_table,
 					    freqmax - 1, CPUFREQ_RELATION_H,
@@ -296,43 +291,24 @@ static unsigned int choose_freq(
 				freq = pcpu->freq_table[index].frequency;
 
 				if (freq == freqmin) {
-					/*
-					 * The first frequency below freqmax
-					 * has already been found to be too
-					 * low.  freqmax is the lowest speed
-					 * we found that is fast enough.
-					 */
 					freq = freqmax;
 					break;
 				}
 			}
 		} else if (freq < prevfreq) {
-			/* The previous frequency is high enough. */
 			freqmax = prevfreq;
 
 			if (freq <= freqmin) {
-				/*
-				 * Find the lowest frequency that is higher
-				 * than freqmin.
-				 */
 				if (cpufreq_frequency_table_target(
 					    pcpu->policy, pcpu->freq_table,
 					    freqmin + 1, CPUFREQ_RELATION_L,
 					    &index))
 					break;
 				freq = pcpu->freq_table[index].frequency;
-
-				/*
-				 * If freqmax is the first frequency above
-				 * freqmin then we have already found that
-				 * this speed is fast enough.
-				 */
 				if (freq == freqmax)
 					break;
 			}
 		}
-
-		/* If same frequency chosen as previous then done. */
 	} while (freq != prevfreq);
 
 	return freq;
@@ -375,6 +351,7 @@ static void cpufreq_interactive_timer(unsigned long data)
 	unsigned int loadadjfreq;
 	unsigned int index;
 	unsigned long flags;
+	unsigned int stic_hispeed_freq;
 
 	if (!down_read_trylock(&pcpu->enable_sem))
 		return;
@@ -399,13 +376,14 @@ static void cpufreq_interactive_timer(unsigned long data)
 	loadadjfreq = (unsigned int)cputime_speedadj * 100;
 	cpu_load = loadadjfreq / pcpu->policy->cur;
 	boosted = boost_val || now < boostpulse_endtime;
+/* stic */
+	stic_hispeed_freq = max(hispeed_freq, pcpu->policy->min);
 
 	if (cpu_load >= go_hispeed_load || boosted) {
 		if (pcpu->policy->cur < hispeed_freq) {
 			new_freq = hispeed_freq;
 		} else {
 			new_freq = choose_freq(pcpu, loadadjfreq);
-
 			if (new_freq < hispeed_freq)
 				new_freq = hispeed_freq;
 		}
@@ -456,6 +434,11 @@ static void cpufreq_interactive_timer(unsigned long data)
 			spin_unlock_irqrestore(&pcpu->target_freq_lock, flags);
 			goto rearm;
 		}
+	}
+
+	if (pcpu->stic_boosted) {
+		mod_min_sample_time = 0;
+		pcpu->stic_boosted = false;
 	}
 
 	/*
@@ -703,7 +686,8 @@ static int cpufreq_interactive_notifier(
 	int cpu;
 	unsigned long flags;
 
-	if (val == CPUFREQ_POSTCHANGE) {
+/*	if (val == CPUFREQ_POSTCHANGE) { */
+	if (val == CPUFREQ_PRECHANGE) {
 		pcpu = &per_cpu(cpuinfo, freq->cpu);
 		if (!down_read_trylock(&pcpu->enable_sem))
 			return 0;
@@ -1184,9 +1168,6 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 
 	switch (event) {
 	case CPUFREQ_GOV_START:
-		if (!cpu_online(policy->cpu))
-			return -EINVAL;
-
 		mutex_lock(&gov_lock);
 
 		freq_table =
@@ -1212,8 +1193,10 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 			pcpu->local_hvtime = pcpu->floor_validate_time;
 			pcpu->max_freq = policy->max;
 			down_write(&pcpu->enable_sem);
+/* gov_start */
 			del_timer_sync(&pcpu->cpu_timer);
 			del_timer_sync(&pcpu->cpu_slack_timer);
+/* gov_start */
 			pcpu->last_evaluated_jiffy = get_jiffies_64();
 			cpufreq_interactive_timer_start(j);
 			pcpu->governor_enabled = 1;
