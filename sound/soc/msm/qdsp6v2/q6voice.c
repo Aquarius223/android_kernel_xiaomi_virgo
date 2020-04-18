@@ -4868,7 +4868,6 @@ int voc_end_voice_call(uint32_t session_id)
 
 #ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
 	var_in_phone_call = false;
-	pr_info("%s: set wake_helper var_in_phone_call: %s\n", __func__, (var_in_phone_call ? "true" : "false"));
 #endif
 
 	mutex_unlock(&v->lock);
@@ -5188,7 +5187,6 @@ int voc_start_voice_call(uint32_t session_id)
 	}
 #ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
 	var_in_phone_call = true;
-	pr_info("%s: set wake_helper var_in_phone_call: %s\n", __func__, (var_in_phone_call ? "true" : "false"));
 #endif
 fail:
 	mutex_unlock(&v->lock);

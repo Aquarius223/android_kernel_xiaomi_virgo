@@ -1,9 +1,9 @@
 /*
  * drivers/input/touchscreen/doubletap2wake.c
  *
- *
  * Copyright (c) 2013, Dennis Rassmann <showp1984@gmail.com>
  * Copyright (c) 2015, Vineeth Raj <contact.twn@openmailbox.org>
+ * Copyright (C) 2020 Amktiao.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -33,12 +33,6 @@
 #include <linux/input.h>
 #include <linux/hrtimer.h>
 #include <asm-generic/cputime.h>
-
-/* uncomment since no touchscreen defines android touch, do that here */
-//#define ANDROID_TOUCH_DECLARED
-
-/* uncomment if dt2w_scr_suspended is updated automagically */
-//#define WAKE_HOOKS_DEFINED
 
 #ifndef WAKE_HOOKS_DEFINED
 #ifndef CONFIG_HAS_EARLYSUSPEND
@@ -70,19 +64,10 @@ MODULE_LICENSE("GPLv2");
 
 #define DT2W_PWRKEY_DUR			60
 #define DT2W_FEATHER			200
-#define DT2W_TIME				700
+#define DT2W_TIME				720
 
-#if defined(CONFIG_ARCH_MSM8974)
 #define DT2W_X_MAX				1080
 #define DT2W_Y_LIMIT			1920
-#elif defined(CONFIG_MACH_PICO)
-#define DT2W_X_MAX				1024
-#define DT2W_Y_LIMIT			910
-#else
-/* defaults */
-#define DT2W_X_MAX				1540
-#define DT2W_Y_LIMIT			2350
-#endif
 
 #define DT2W_Y_B1				300
 #define DT2W_Y_B2				DT2W_Y_LIMIT-300
@@ -113,16 +98,16 @@ static struct work_struct dt2w_input_work;
 static int __init read_dt2w_cmdline(char *dt2w)
 {
 	if (strcmp(dt2w, "1") == 0) {
-		pr_info("[cmdline_dt2w]: DoubleTap2Wake enabled. | dt2w='%s'\n", dt2w);
+		pr_debug("[cmdline_dt2w]: DoubleTap2Wake enabled. | dt2w='%s'\n", dt2w);
 		dt2w_switch = 1;
 	} else if (strcmp(dt2w, "2") == 0) {
-		pr_info("[cmdline_dt2w]: DoubleTap2Wake (MusiqMod) enabled. | dt2w='%s'\n", dt2w);
+		pr_debug("[cmdline_dt2w]: DoubleTap2Wake (MusiqMod) enabled. | dt2w='%s'\n", dt2w);
 		dt2w_switch = 2;
 	} else if (strcmp(dt2w, "0") == 0) {
-		pr_info("[cmdline_dt2w]: DoubleTap2Wake disabled. | dt2w='%s'\n", dt2w);
+		pr_debug("[cmdline_dt2w]: DoubleTap2Wake disabled. | dt2w='%s'\n", dt2w);
 		dt2w_switch = 0;
 	} else {
-		pr_info("[cmdline_dt2w]: No valid input found. Going with default: | dt2w='%u'\n", dt2w_switch);
+		pr_debug("[cmdline_dt2w]: No valid input found. Going with default: | dt2w='%u'\n", dt2w_switch);
 	}
 	return 1;
 }
@@ -181,7 +166,7 @@ static void detect_doubletap2wake(int x, int y, bool st)
 {
         bool single_touch = st;
 #if DT2W_DEBUG
-        pr_info(LOGTAG"x,y(%4d,%4d) single:%s\n",
+        pr_debug(LOGTAG"x,y(%4d,%4d) single:%s\n",
                 x, y, (single_touch) ? "true" : "false");
 #endif
 	if (x < 100 || x > 980) {
@@ -214,17 +199,17 @@ static void detect_doubletap2wake(int x, int y, bool st)
 			if ((dt2w_switch == 2) && (is_headset_in_use() || dt2w_sent_play_pause)) {
 				if ((y > DT2W_Y_B1) && (y < DT2W_Y_B2)) {
 					if ((x > DT2W_X_B1) && (x < DT2W_X_B2)) {
-						pr_info(LOGTAG"MusiqMod: play_pause\n");
+						pr_debug(LOGTAG"MusiqMod: play_pause\n");
 						key_code =  KEY_PLAYPAUSE;
 						dt2w_sent_play_pause = 1;
 						doubletap2wake_pwrtrigger();
 					} else if (x < DT2W_X_B1) {
-						pr_info(LOGTAG"MusiqMod: previous song\n");
+						pr_debug(LOGTAG"MusiqMod: previous song\n");
 						key_code =  KEY_PREVIOUSSONG;
 						dt2w_sent_play_pause = 1;
 						doubletap2wake_pwrtrigger();
 					} else if (x > DT2W_X_B2) {
-						pr_info(LOGTAG"MusiqMod: next song\n");
+						pr_debug(LOGTAG"MusiqMod: next song\n");
 						key_code =  KEY_NEXTSONG;
 						dt2w_sent_play_pause = 1;
 						doubletap2wake_pwrtrigger();
@@ -233,7 +218,7 @@ static void detect_doubletap2wake(int x, int y, bool st)
 					doubletap2wake_reset();
 				}
 			} else {
-				pr_info(LOGTAG"on_off\n");
+				pr_debug(LOGTAG"on_off\n");
 				key_code =  KEY_POWER;
 				dt2w_sent_play_pause = 0;
 				doubletap2wake_pwrtrigger();
@@ -246,7 +231,7 @@ static void detect_doubletap2wake(int x, int y, bool st)
 static void dt2w_input_callback(struct work_struct *unused) {
 	if (in_phone_call()) {
 #if DT2W_DEBUG
-		pr_info("DoubleTap2Wake: in phone call! return!\n");
+		pr_debug("DoubleTap2Wake: in phone call! return!\n");
 #endif
 		return;
 	}
@@ -259,7 +244,7 @@ static void dt2w_input_callback(struct work_struct *unused) {
 static void dt2w_input_event(struct input_handle *handle, unsigned int type,
 				unsigned int code, int value) {
 #if DT2W_DEBUG
-	pr_info("doubletap2wake: code: %s|%u, val: %i\n",
+	pr_debug("doubletap2wake: code: %s|%u, val: %i\n",
 		((code==ABS_MT_POSITION_X) ? "X" :
 		(code==ABS_MT_POSITION_Y) ? "Y" :
 		(code==ABS_MT_TRACKING_ID) ? "ID" :
@@ -509,7 +494,7 @@ static int __init doubletap2wake_init(void)
 err_input_dev:
 	input_free_device(doubletap2wake_pwrdev);
 err_alloc_dev:
-	pr_info(LOGTAG"%s done\n", __func__);
+	pr_debug(LOGTAG"%s done\n", __func__);
 
 	return 0;
 }
