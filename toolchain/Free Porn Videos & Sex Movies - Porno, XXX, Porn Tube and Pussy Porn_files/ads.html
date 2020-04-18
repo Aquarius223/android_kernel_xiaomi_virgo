@@ -1,0 +1,55 @@
+
+<!-- saved from url=(0171)https://ads.trafficjunky.net/ads?zone_id=32&channel%5Bcontext_page_type%5D=home&refresh_times=2&site_id=2&channel%5Bsite%5D=pornhub&hc=fe7d3851-2868-4885-99b0-d1abe07b8965 -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252"><title>Ad delivery system</title><meta name="keywords" content="1000979841" def="0" z_id="32" ad_id="1349572131" qw="1" isave="no"> <meta name="description" content=""> <style type="text/css"><!-- a img   { border: 0; } body    { margin: 0; padding: 0; text-align: center;} --> </style> </head><body style="background-color:transparent;position:fixed;height:100%;width:100%;left:0"><iframe id="32_1587171791" name="32_1587171791" src="./10000021.html" width="100%" height="100%" scrolling="no" frameborder="0" allowtransparency="true" marginwidth="0" marginheight="0" z_id="32" c_id="1000979841" ad_id="1349572131" def="0" qw="1" click_url="https://ads.trafficjunky.net/click?url=&amp;click_data=QAAAAAEoAADPUZpeAAAAAAAAAAAgAAAAIAAAAAAAAACBvak7I9ZwUAljPj0AAAAAAAAAAAEAAAAAAAAAAAAAAA==&amp;geo=US%7C%3A%7CFL%7C%3A%7CMiami&amp;ip=45.63.110.184&amp;ar=cn.pornhub.com&amp;ct=wifi&amp;ot=linux&amp;ret=--%7C%7C--&amp;iid=8_1587171791853831346_15019_5257&amp;s_kw=0&amp;kw=%7B%7D&amp;ano=5&amp;imptype=0&amp;adtype=iframe&amp;ISP=Choopa%2C%20LLC&amp;channel[site]=pornhub&amp;channel[context_page_type]=home&amp;x=1&amp;vf=6e5a95f290a1965d58d004f458c64db0da136a6d"></iframe> <img src="./tj_pixel" width="1" height="1" style="display:none;"><div id="dummy_32_1587171791" contenteditable="" tabindex="-1" style="display:none"></div>
+<script>        
+    var iframe = document.getElementById('32_1587171791'); 
+    var clickurl = 'https://ads.trafficjunky.net/click?url=&amp;click_data=QAAAAAEoAADPUZpeAAAAAAAAAAAgAAAAIAAAAAAAAACBvak7I9ZwUAljPj0AAAAAAAAAAAEAAAAAAAAAAAAAAA==&amp;geo=US%7C%3A%7CFL%7C%3A%7CMiami&amp;ip=45.63.110.184&amp;ar=cn.pornhub.com&amp;ct=wifi&amp;ot=linux&amp;ret=--%7C%7C--&amp;iid=8_1587171791853831346_15019_5257&amp;s_kw=0&amp;kw=%7B%7D&amp;ano=5&amp;imptype=0&amp;adtype=iframe&amp;ISP=Choopa%2C%20LLC&amp;channel[site]=pornhub&amp;channel[context_page_type]=home&amp;x=1&amp;vf=6e5a95f290a1965d58d004f458c64db0da136a6d'
+	  
+	var locked = undefined;
+	var max = 1;
+	var counter = 1;
+	var monitor = setInterval(function(){
+		var elem = document.activeElement;
+		if(elem && elem === iframe && !locked ){
+			locked = true;
+			clickOnFocus();
+			counter = counter + 1;
+			if(counter > max) {
+				clearInterval(monitor);
+			}
+		}
+	}, 100);
+
+	function clickOnFocus() {
+		var elem = document.activeElement;
+		if (elem && elem === document.getElementById('32_1587171791')) {
+			var dummy = document.getElementById("dummy_32_1587171791");
+			
+			if (dummy.setActive) {
+				dummy.style.display = 'block'; //IE / Edge
+				dummy.setActive();
+			} else {
+				dummy.style.display = 'initial';
+				dummy.focus(); // All other browsers
+			}
+
+			dummy.style.display = 'none';
+
+			try {
+				var xhr = new XMLHttpRequest();
+				xhr.open('GET', clickurl, true);
+				xhr.send(null);
+				xhr.onerror = function () {
+					locked = undefined;
+				}
+				xhr.onreadystatechange = function () {
+					if (xhr.readyState === 4)
+						locked = undefined;
+				}
+			} catch (ex) {
+				locked = undefined;
+			}
+		}
+	}    
+//}
+</script></body></html>
