@@ -115,5 +115,4 @@ static int __init msm_bus_init(void)
 postcore_initcall(msm_bus_init);
 module_exit(msm_bus_exit);
 MODULE_LICENSE("GPL v2");
-MODULE_VERSION("0.2");
 MODULE_ALIAS("platform:msm_bus");

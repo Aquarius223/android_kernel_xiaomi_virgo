@@ -415,6 +415,13 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	struct msm_watchdog_data *wdog_dd = (struct msm_watchdog_data *)dev_id;
 	unsigned long nanosec_rem;
 	unsigned long long t = sched_clock();
+	
+#ifdef CONFIG_ARCH_MSM8974
+	if (irq == 35) {
+		wdog_dd->last_pet = sched_clock();
+ 		return IRQ_HANDLED;
+	}
+#endif
 
 	nanosec_rem = do_div(t, 1000000000);
 	printk(KERN_INFO "Watchdog bark! Now = %lu.%06lu\n", (unsigned long) t,

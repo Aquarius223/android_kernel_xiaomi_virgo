@@ -42,10 +42,9 @@ struct westwood {
 	u8     reset_rtt_min;    /* Reset RTT min to next RTT sample*/
 };
 
-
 /* TCP Westwood functions and constants */
-#define TCP_WESTWOOD_RTT_MIN   (HZ/18)	/* 50ms */
-#define TCP_WESTWOOD_INIT_RTT  (18*HZ)	/* maybe too conservative?! */
+#define TCP_WESTWOOD_RTT_MIN   (HZ/18)
+#define TCP_WESTWOOD_INIT_RTT  (18*HZ)
 
 /*
  * @tcp_westwood_create

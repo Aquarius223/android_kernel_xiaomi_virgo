@@ -401,5 +401,4 @@ module_exit(msm_rpmstats_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MSM RPM Statistics driver");
-MODULE_VERSION("1.0");
 MODULE_ALIAS("platform:msm_stat_log");

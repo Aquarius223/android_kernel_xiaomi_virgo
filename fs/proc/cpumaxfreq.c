@@ -5,7 +5,7 @@
 
 static int cpumaxfreq_show(struct seq_file *m, void *v)
 {
-	seq_printf(m, "2.5\n");
+	seq_printf(m, "2.5");
 
 	return 0;
 }

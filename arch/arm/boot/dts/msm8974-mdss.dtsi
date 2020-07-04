@@ -21,7 +21,7 @@
 		vdd-supply = <&gdsc_mdss>;
 
 		qcom,max-bandwidth-low-kbps = <2300000>;
-		qcom,max-bandwidth-high-kbps = <3200000>;
+		qcom,max-bandwidth-high-kbps = <3000000>;
 
 		/* Bus Scale Settings */
 		qcom,msm-bus,name = "mdss_mdp";

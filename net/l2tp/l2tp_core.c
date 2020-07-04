@@ -1699,5 +1699,3 @@ module_exit(l2tp_exit);
 MODULE_AUTHOR("James Chapman <jchapman@katalix.com>");
 MODULE_DESCRIPTION("L2TP core");
 MODULE_LICENSE("GPL");
-MODULE_VERSION(L2TP_DRV_VERSION);
-

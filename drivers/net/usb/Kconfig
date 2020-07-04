@@ -492,10 +492,5 @@ config MSM_RMNET_USB
 
 	To compile this driver as a module, choose M here: the module
 	will be called rmnet_usb. If unsure, choose N.
-	
-config USB_NET_SR9700
-	tristate "CoreChip-sz SR9700 based USB 1.1 10/100 ethernet devices"
-	depends on USB_USBNET
-	select CRC32
 
 endmenu

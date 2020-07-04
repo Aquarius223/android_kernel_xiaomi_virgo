@@ -24,7 +24,6 @@
 #include <linux/cpufreq.h>
 
 #include <asm/cputype.h>
-
 #include <mach/rpm-regulator-smd.h>
 #include <mach/clk-provider.h>
 #include <mach/clock-generic.h>
@@ -593,7 +592,7 @@ module_param(pvs_config_ver, uint, S_IRUGO);
 
 #ifdef CONFIG_MSM_CPU_VOLTAGE_CONTROL
 #define CPU_VDD_MAX	1150
-#define CPU_VDD_MIN	585
+#define CPU_VDD_MIN	500
 
 extern int use_for_scaling(unsigned int freq);
 static unsigned int cnt;

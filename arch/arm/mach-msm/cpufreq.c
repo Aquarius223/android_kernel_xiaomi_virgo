@@ -513,7 +513,6 @@ static int cpufreq_parse_dt(struct device *dev)
 	freq_table[i].frequency = CPUFREQ_TABLE_END;
 
 #ifdef CONFIG_MSM_CPU_VOLTAGE_CONTROL
-	/* Create frequence table with unrounded values */
 	krait_freq_table = devm_kzalloc(dev, (nf + 1) * sizeof(*krait_freq_table),
 					GFP_KERNEL);
 	if (!krait_freq_table)

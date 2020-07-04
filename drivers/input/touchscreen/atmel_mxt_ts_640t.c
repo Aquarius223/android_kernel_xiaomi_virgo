@@ -5,7 +5,6 @@
  * Copyright (C) 2011 Atmel Corporation
  * Author: Joonyoung Shim <jy0922.shim@samsung.com>
  * Copyright (C) 2017 XiaoMi, Inc.
- * Copyright (C) 2020 Amktiao.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -39,6 +38,7 @@
 #include <linux/input/sweep2wake.h>
 #include <linux/input/wake_helpers.h>
 
+
 /* Version */
 #define MXT_VER_20		20
 #define MXT_VER_21		21
@@ -59,7 +59,9 @@
 #define MXT_MATRIX_Y_SIZE	0x05
 #define MXT_OBJECT_NUM		0x06
 #define MXT_OBJECT_START	0x07
+
 #define MXT_OBJECT_SIZE		6
+
 #define MXT_MAX_BLOCK_WRITE	256
 
 /* Object types */
@@ -318,6 +320,7 @@
 #define MXT_SELFCAPCFG_CTRL	0
 #define MXT_SELFCAPCFG_CMD	3
 
+
 /* Defines for Suspend/Resume */
 #define MXT_SUSPEND_STATIC      0
 #define MXT_SUSPEND_DYNAMIC     1
@@ -507,6 +510,7 @@
 #define MXT_DEBUGFS_DIR		"atmel_mxt_ts"
 #define MXT_DEBUGFS_FILE		"object"
 
+
 #define MXT_INPUT_EVENT_START		0
 #define MXT_INPUT_EVENT_SENSITIVE_MODE_OFF		0
 #define MXT_INPUT_EVENT_SENSITIVE_MODE_ON		1
@@ -535,6 +539,8 @@ struct mxt_object {
 	u16 size;
 	u16 instances;
 	u8 num_report_ids;
+
+	/* to map object and message */
 	u8 min_reportid;
 	u8 max_reportid;
 };
@@ -557,6 +563,7 @@ struct mxt_golden_msg {
 	u8 fcalmaxdiffy;
 };
 
+
 struct mxt_selfcap_status {
 	u8 cmd;
 	u8 error_code;
@@ -568,6 +575,7 @@ struct mxt_mode_switch {
 	struct work_struct switch_mode_work;
 };
 
+/* Each client has this additional data */
 struct mxt_data {
 	struct i2c_client *client;
 	struct input_dev *input_dev;
@@ -620,6 +628,8 @@ struct mxt_data {
 	u8 userdata_info[MXT_USERDATA_SIZE];
 	bool firmware_updated;
 	bool button_0d_enabled;
+
+	/* Slowscan parameters	*/
 	int slowscan_enabled;
 	u8 slowscan_actv_cycle_time;
 	u8 slowscan_idle_cycle_time;
@@ -633,6 +643,8 @@ struct mxt_data {
 	struct work_struct hover_loading_work;
 	bool finger_down[MXT_MAX_FINGER_NUM];
 	bool screen_off;
+
+	/* Cached parameters from object table */
 	u16 T5_address;
 	u8 T5_msg_size;
 	u8 T6_reportid;
@@ -676,6 +688,7 @@ static struct mxt_suspend mxt_save[] = {
 		MXT_T7_ACTV2IDLE_DISABLE, MXT_SUSPEND_DYNAMIC, 0}
 };
 
+/* I2C slave address pairs */
 struct mxt_i2c_address_pair {
 	u8 bootloader;
 	u8 application;
@@ -748,6 +761,7 @@ static int mxt_prevent_sleep (void) {
 	} else {
 		return 0;
 	}
+
 }
 
 static int mxt_bootloader_write(struct mxt_data *data, const u8 * const val,
@@ -849,6 +863,7 @@ static int mxt_wait_for_chg(struct mxt_data *data)
 		dev_err(&data->client->dev, "mxt_wait_for_chg() timeout!\n");
 		return -EIO;
 	}
+
 	return 0;
 }
 
@@ -868,6 +883,7 @@ static u8 mxt_get_bootloader_version(struct mxt_data *data, u8 val)
 		return buf[0];
 	} else {
 		dev_info(dev, "Bootloader ID:%d\n", val & MXT_BOOT_ID_MASK);
+
 		return val;
 	}
 }
@@ -939,6 +955,7 @@ static int mxt_send_bootloader_cmd(struct mxt_data *data, bool unlock)
 				__func__, ret);
 		return ret;
 	}
+
 	return 0;
 }
 
@@ -953,11 +970,13 @@ static int mxt_read_reg(struct i2c_client *client,
 	buf[0] = reg & 0xff;
 	buf[1] = (reg >> 8) & 0xff;
 
+	/* Write register */
 	xfer[0].addr = client->addr;
 	xfer[0].flags = 0;
 	xfer[0].len = 2;
 	xfer[0].buf = buf;
 
+	/* Read data */
 	xfer[1].addr = client->addr;
 	xfer[1].flags = I2C_M_RD;
 	xfer[1].len = len;
@@ -969,6 +988,7 @@ static int mxt_read_reg(struct i2c_client *client,
 				__func__, ret);
 		return -EIO;
 	}
+
 	return 0;
 }
 
@@ -1244,6 +1264,7 @@ static int mxt_do_diagnostic(struct mxt_data *data, u8 mode)
 
 static void mxt_set_t7_for_gesture(struct mxt_data *data, bool enable);
 static void mxt_set_gesture_wake_up(struct mxt_data *data, bool enable);
+
 static void mxt_proc_t100_messages(struct mxt_data *data, u8 *message)
 {
 	struct device *dev = &data->client->dev;
@@ -1891,7 +1912,7 @@ static int mxt_download_config(struct mxt_data *data, const char *fn)
 				type = 150 + add_num - 1;
 		}
 
-		pr_debug("write to type = %d, instance = %d, size = %d, offset = %d\n",
+		pr_info("write to type = %d, instance = %d, size = %d, offset = %d\n",
 				(int)type, (int)instance, (int)size, (int)offset);
 
 		object = mxt_get_object(data, type);
@@ -3660,7 +3681,7 @@ static bool mxt_self_tune_pass(struct mxt_data *data, bool is_hover_mode)
 			j++;
 		}
 		val = (buf[i+1] << 8) | buf[i];
-		pr_debug("tune val [%d] = %d\n", i, val);
+		pr_info("tune val [%d] = %d\n", i, val);
 		if (val > 17384 || val < 15384) {
 			kfree(buf);
 			return false;
@@ -4547,7 +4568,7 @@ static void mxt_set_t7_for_gesture(struct mxt_data *data, bool enable)
 		error = mxt_write_object(data, MXT_GEN_POWER_T7,
 				i, t7_val[i]);
 		if (error) {
-			pr_debug("write to t7 byte %d failed!\n", i);
+			pr_info("write to t7 byte %d failed!\n", i);
 			return;
 		}
 	}
@@ -4631,6 +4652,10 @@ static void mxt_start(struct mxt_data *data)
 		if (error)
 			return;
 	}
+		/* At this point, it may be necessary to clear state
+		 * by disabling/re-enabling the noise suppression object */
+
+		/* Recalibrate since chip has been in deep sleep */
 		schedule_delayed_work(&data->calibration_delayed_work, msecs_to_jiffies(100));
 	}
 
@@ -4705,6 +4730,7 @@ static int mxt_suspend(struct device *dev)
 	}
 
 	if (data->pdata->cut_off_power) {
+		/* In the power is cut off with LCD off, wake up gesture can not be used */
 		mutex_lock(&input_dev->mutex);
 
 		if (data->is_stopped) {
@@ -5727,3 +5753,4 @@ module_exit(mxt_exit);
 MODULE_AUTHOR("Lionel Zhang <zhangbo_a@xiaomi.com>");
 MODULE_DESCRIPTION("Atmel maXTouch Touchscreen driver");
 MODULE_LICENSE("GPL");
+

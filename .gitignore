@@ -87,5 +87,26 @@ GTAGS
 # out-kernel
 out
 
+# server-build
+build.sh
+
+# computer-gcc-build
+build-gcc.sh
+
+# pornhub-video
+pornhub-video-temp
+
+# Maomi-video
+stic-pandownload-maomiav
+
+# files
+PAPAPA-SM
+
+# google compiler
+gcc4.9
+
+# phone-build
+phone_build.sh
+
 # Generated source files
 smd_rpc_sym.c

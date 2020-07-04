@@ -3538,5 +3538,4 @@ static void __exit msm_spi_exit(void)
 module_exit(msm_spi_exit);
 
 MODULE_LICENSE("GPL v2");
-MODULE_VERSION("0.4");
 MODULE_ALIAS("platform:"SPI_DRV_NAME);

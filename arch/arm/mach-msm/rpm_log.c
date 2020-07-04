@@ -531,5 +531,4 @@ module_exit(msm_rpm_log_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MSM RPM Log driver");
-MODULE_VERSION("1.0");
 MODULE_ALIAS("platform:msm_rpm_log");

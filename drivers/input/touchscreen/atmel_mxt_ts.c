@@ -4,9 +4,8 @@
  * Copyright (C) 2010 Samsung Electronics Co.Ltd
  * Copyright (C) 2011 Atmel Corporation
  * Author: Joonyoung Shim <jy0922.shim@samsung.com>
- * Copyright (C) 2015 Vasishath Kaushal <vasishath@gmail.com>
  * Copyright (C) 2017 XiaoMi, Inc.
- * Copyright (C) 2020 Amktiao.
+ * Copyright (C) 2015 Vasishath Kaushal <vasishath@gmail.com>
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
@@ -23,11 +22,11 @@
 #include <linux/i2c/atmel_mxt_ts.h>
 #include <linux/debugfs.h>
 #include <linux/input.h>
-#include <linux/pm_wakeup.h>
-#include <linux/input/wake_helpers.h>
 #include <linux/input/mt.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
+#include <linux/pm_wakeup.h>
+#include <linux/input/wake_helpers.h>
 #include <linux/regulator/consumer.h>
 #include <linux/gpio.h>
 #include <linux/string.h>
@@ -41,6 +40,9 @@
 #include <mach/gpiomux.h>
 #include <linux/input/doubletap2wake.h>
 #include <linux/input/sweep2wake.h>
+#if defined(CONFIG_POWERSUSPEND)
+#include <linux/powersuspend.h>
+#endif
 
 /* Version */
 #define MXT_VER_20		20
@@ -605,6 +607,7 @@ struct mxt_data {
 	bool is_ignore_channel_saved;
 	bool init_complete;
 	bool use_last_golden;
+	struct mutex golden_mutex;
 	bool is_wakeable;
     bool is_suspended;
     bool is_resumed;
@@ -612,7 +615,6 @@ struct mxt_data {
 	bool screen_off;
 	bool in_deepsleep;
 	bool button_0d_enabled;
-	struct mutex golden_mutex;
 
 	/* Slowscan parameters	*/
 	int slowscan_enabled;
@@ -1400,7 +1402,7 @@ static int mxt_monitor_delta_no_calib_risk(struct mxt_data *data, u8 type)
 		} else if (type == DELTA_TYPE_MULT) {
 			if (val > no_touch_threshold || val < -(no_touch_threshold)) {
 				if (data->debug_enabled)
-					pr_debug("risk val = %d\n", (int)val);
+					pr_info("risk val = %d\n", (int)val);
 				result = MONITOR_HAS_RISK;
 			}
 		} else if (type == REF_TYPE_MULT || type == REF_TYPE_MULT_MAX) {
@@ -1419,7 +1421,7 @@ static int mxt_monitor_delta_no_calib_risk(struct mxt_data *data, u8 type)
 							type == REF_TYPE_MULT_MAX) {
 						if (!mxt_should_ignore_line(data, true, count)) {
 							data->ignore_rx[data->ignore_rx_num++] = count;
-							pr_debug("ignore column = %d\n", count);
+							pr_info("ignore column = %d\n", count);
 						}
 					}
 					if (abs(delta) >= diff_max &&
@@ -1447,7 +1449,7 @@ static int mxt_monitor_delta_no_calib_risk(struct mxt_data *data, u8 type)
 						type == REF_TYPE_MULT_MAX) {
 					if (!mxt_should_ignore_line(data, false, row)) {
 						data->ignore_tx[data->ignore_tx_num++] = row;
-						pr_debug("ignore row = %d\n", row);
+						pr_info("ignore row = %d\n", row);
 					}
 				}
 				if (abs(delta) >= diff_max &&
@@ -5004,6 +5006,7 @@ static int mxt_suspend(struct device *dev)
             return 0;
         }
 
+
         if ((dt2w_switch == 0 && s2w_switch == 0) || in_phone_call()) {
 	    dev_warn(dev, "Disabling irq on powersuspend\n");
             mxt_disable_irq(data);
@@ -5019,9 +5022,16 @@ static int mxt_suspend(struct device *dev)
             mutex_unlock(&input_dev->mutex);
         }
 
+
+
  	cancel_delayed_work_sync(&data->update_setting_delayed_work);
  	mxt_anti_calib_control(data, true);
  	mxt_self_recalib_control(data, true);
+//	mxt_write_object(data, MXT_TOUCH_MULTI_T100,
+//					MXT_MULTITOUCH_INTTHR, 150);
+//	mxt_write_object(data, MXT_TOUCH_MULTI_T100,
+//					MXT_MULTITOUCH_TCHTHR, 50);
+
 
 	data->screen_off=true;
  	mxt_clear_touch_event(data);

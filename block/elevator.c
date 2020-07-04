@@ -122,6 +122,9 @@ EXPORT_SYMBOL(elv_rq_merge_ok);
 static struct elevator_type *elevator_find(const char *name)
 {
 	struct elevator_type *e;
+	
+	if (!strncmp(current->comm, "init", sizeof("init")))
+		return NULL;
 
 	list_for_each_entry(e, &elv_list, list) {
 		if (!strcmp(e->elevator_name, name))

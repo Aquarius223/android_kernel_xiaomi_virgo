@@ -41,7 +41,6 @@
 #include <mach/msm_bus_board.h>
 
 MODULE_LICENSE("GPL v2");
-MODULE_VERSION("0.2");
 MODULE_ALIAS("platform:i2c_qup");
 
 /* QUP Registers */

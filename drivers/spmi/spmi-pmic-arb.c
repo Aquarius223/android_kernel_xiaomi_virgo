@@ -909,5 +909,4 @@ static void __exit spmi_pmic_arb_exit(void)
 module_exit(spmi_pmic_arb_exit);
 
 MODULE_LICENSE("GPL v2");
-MODULE_VERSION("1.0");
 MODULE_ALIAS("platform:spmi_pmic_arb");

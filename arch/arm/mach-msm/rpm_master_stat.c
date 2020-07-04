@@ -433,5 +433,4 @@ module_exit(msm_rpm_master_stats_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("MSM RPM Master Statistics driver");
-MODULE_VERSION("1.0");
 MODULE_ALIAS("platform:msm_master_stat_log");
