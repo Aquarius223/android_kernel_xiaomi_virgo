@@ -34,7 +34,7 @@ struct sg_io_hdr;
 struct bsg_job;
 
 #define BLKDEV_MIN_RQ	4
-#define BLKDEV_MAX_RQ	36	/* Default maximum */
+#define BLKDEV_MAX_RQ	CONFIG_BLKDEV_MAX_RQ
 
 struct request;
 typedef void (rq_end_io_fn)(struct request *, int);

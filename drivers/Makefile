@@ -148,4 +148,6 @@ obj-$(CONFIG_BIF)		+= tspdrv/
 obj-$(CONFIG_BIF)		+= bif/
 obj-$(CONFIG_SENSORS)		+= sensors/
 
+# obj-$(CONFIG_STICKERNEL)		+= stickernel/
+
 obj-$(CONFIG_IIO)		+= iio/

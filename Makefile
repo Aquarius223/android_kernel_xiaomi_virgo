@@ -1,8 +1,11 @@
+# SticKernel ------ Server Patch (Ubuntu)
+
 VERSION = 3
 PATCHLEVEL = 4
 SUBLEVEL = 113
 EXTRAVERSION =
 NAME = Saber-toothed Squirrel
+# STICVERSION = 3.4.113
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -254,11 +257,6 @@ HOSTCXXFLAGS = -O2
 KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
 
-#	If we have only "make modules", don't compile built-in objects.
-#	When we're building modules with modversions, we need to consider
-#	the built-in objects during the descend as well, in order to
-#	make sure the checksums are up to date before we record them.
-
 ifeq ($(MAKECMDGOALS),modules)
   KBUILD_BUILTIN := $(if $(CONFIG_MODVERSIONS),1)
 endif
@@ -317,7 +315,6 @@ ifneq ($(filter s% -s%,$(MAKEFLAGS)),)
 endif
 
 export quiet Q KBUILD_VERBOSE
-
 
 # Look for make include files relative to root of kernel src
 MAKEFLAGS += --include-dir=$(srctree)

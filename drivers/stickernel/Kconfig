@@ -1,0 +1,30 @@
+config STICKERNEL
+	boolean "stickernel modules"
+	default y
+	---help---
+	  Provide a connector that reports process events to userspace. Send
+	  events such as fork, exec, id change (uid, gid, suid, etc), and exit.
+	  
+if STICKERNEL
+
+config VM_MAX_READAHEAD
+	int "Default readahead size"
+	default "512"
+	range 8 2048
+
+config VM_MIN_READAHEAD
+	int "Default min readahead size"
+	default "16"
+	range 8 2048
+
+config VM_DIRTY_RATIO
+	int "Default vm dirty"
+	default "80"
+	range 20 100
+
+config BLKDEV_MAX_RQ
+	int "Default BLK_MAX_RQ"
+	default "36"
+	range 24 256
+
+endif
